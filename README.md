@@ -26,3 +26,39 @@ sitemap_urls.txt
 ---
 
 
+
+---
+
+## 📋 How to Use
+
+1. Install dependencies:
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+2. Place your `sitemap_urls.txt` file in the project folder.
+
+3. Run the script:
+    ```bash
+    python SitemapURLExtractor.py
+    ```
+
+4. The output Excel file will be saved with this format:
+    ```
+    [domain]_urls_YYYYMMDD_HHMMSS.xlsx
+    ```
+
+---
+
+## 🛠 Dependencies
+- aiohttp
+- asyncio
+- beautifulsoup4
+- pandas
+- tqdm
+- colorama
+- openpyxl (for writing Excel files)
+
+Install all dependencies with:
+```bash
+pip install aiohttp beautifulsoup4 pandas tqdm colorama openpyxl
