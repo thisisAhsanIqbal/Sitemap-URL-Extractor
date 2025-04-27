@@ -1,5 +1,12 @@
 # Sitemap URL Extractor
 
+![Python](https://img.shields.io/badge/Python-3.8%2B-blue?logo=python)
+![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
+![Status](https://img.shields.io/badge/Status-Active-brightgreen)
+![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-blueviolet)
+
+---
+
 An advanced asynchronous Python tool that **fetches and extracts all URLs** (and optional last-modified dates) from multiple sitemap XML files.  
 Results are saved in a structured Excel file with high-speed processing and colorful progress tracking.
 
