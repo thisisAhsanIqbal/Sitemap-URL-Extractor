@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 from urllib.parse import urlparse
 from datetime import datetime
@@ -44,27 +45,17 @@ async def fetch_sitemap(session, sitemap_url):
         return None, sitemap_url
 
 def parse_sitemap(content, sitemap_url):
-    """Parse sitemap XML content and extract URLs and dates"""
+    """Parse sitemap XML content and extract URLs"""
     try:
         soup = BeautifulSoup(content, 'xml')
         urls = []
-        
-        # Find all URL entries
+
         url_tags = soup.find_all('url')
-        
         for url in url_tags:
             loc = url.find('loc')
-            lastmod = url.find('lastmod')
-            
             if loc:
-                url_data = {
-                    'URL': loc.text,
-                    'Source Sitemap': sitemap_url
-                }
-                if lastmod:
-                    url_data['Last Modified'] = pd.to_datetime(lastmod.text).tz_localize(None)
-                urls.append(url_data)
-        
+                urls.append(loc.text.strip())
+
         return urls
     except Exception as e:
         logger.error(f"{Fore.RED}Error parsing sitemap {sitemap_url}: {str(e)}{Style.RESET_ALL}")
@@ -83,22 +74,18 @@ def create_colored_progress_bar(desc, total):
 async def process_sitemaps(sitemap_urls):
     """Process multiple sitemaps concurrently"""
     async with aiohttp.ClientSession() as session:
-        # Create tasks for all sitemaps
         tasks = [fetch_sitemap(session, url) for url in sitemap_urls]
         completed_sitemaps = 0
         total_sitemaps = len(tasks)
-        results = []
+        all_urls = []
 
-        # Create main progress bar
         main_pbar = create_colored_progress_bar("Total Progress", total_sitemaps)
-        
-        # Process tasks with progress bar
+
         for task in asyncio.as_completed(tasks):
             content, sitemap_url = await task
             completed_sitemaps += 1
             remaining = total_sitemaps - completed_sitemaps
-            
-            # Update progress bar with random color
+
             color = get_random_color()
             main_pbar.set_description(
                 f"{color}Processing sitemaps{Style.RESET_ALL} "
@@ -106,25 +93,23 @@ async def process_sitemaps(sitemap_urls):
                 f"{color}{remaining} left{Style.RESET_ALL})"
             )
             main_pbar.update(1)
-            
+
             if content:
                 urls = parse_sitemap(content, sitemap_url)
-                results.extend(urls)
-                color = get_random_color()
-                print(f"{color}✓ Successfully processed: {Style.RESET_ALL}{sitemap_url}")
+                all_urls.extend(urls)
+                print(f"{get_random_color()}✓ Successfully processed:{Style.RESET_ALL} {sitemap_url}")
             else:
-                print(f"{Fore.RED}✗ Failed to process: {Style.RESET_ALL}{sitemap_url}")
-        
+                print(f"{Fore.RED}✗ Failed to process:{Style.RESET_ALL} {sitemap_url}")
+
         main_pbar.close()
-        return results
+        return all_urls
 
 async def main():
     # Set random seed for consistent colors in a single run
     random.seed(datetime.now().timestamp())
-    
-    title_color = get_random_color()
-    print(f"\n{title_color}=== Sitemap URL Extractor ==={Style.RESET_ALL}")
-    
+
+    print(f"\n{get_random_color()}=== Sitemap URL Extractor ==={Style.RESET_ALL}")
+
     # Read sitemap URLs from file
     try:
         with open('sitemap_urls.txt', 'r') as f:
@@ -132,64 +117,67 @@ async def main():
     except FileNotFoundError:
         logger.error(f"{Fore.RED}Error: sitemap_urls.txt not found!{Style.RESET_ALL}")
         return
-    
+
     if not sitemap_urls:
         logger.error(f"{Fore.RED}Error: No sitemap URLs found in sitemap_urls.txt!{Style.RESET_ALL}")
         return
-    
-    info_color = get_random_color()
-    print(f"\n{info_color}Found {len(sitemap_urls)} sitemaps to process{Style.RESET_ALL}")
-    
+
+    print(f"\n{get_random_color()}Found {len(sitemap_urls)} sitemaps to process{Style.RESET_ALL}")
+
     # Process sitemaps
     start_time = datetime.now()
-    results = await process_sitemaps(sitemap_urls)
-    
-    if not results:
-        logger.error(f"{Fore.RED}No data was successfully retrieved from any sitemap!{Style.RESET_ALL}")
+    urls = await process_sitemaps(sitemap_urls)
+
+    if not urls:
+        logger.error(f"{Fore.RED}No URLs were successfully retrieved from any sitemap!{Style.RESET_ALL}")
         return
-    
-    # Create DataFrame
-    df = pd.DataFrame(results)
-    
-    # Save to Excel with timestamp
+
+    # Remove duplicates
+    unique_urls = list(set(urls))
+
+    # Create output folder if it doesn't exist
+    output_folder = "output"
+    os.makedirs(output_folder, exist_ok=True)
+
+    # Prepare filename
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     domain = urlparse(sitemap_urls[0]).netloc.replace('www.', '')
-    excel_filename = f"{domain}_urls_{timestamp}.xlsx"
-    
+    output_filename = os.path.join(output_folder, f"{domain}_urls_{timestamp}.txt")
+
+    # Save URLs to TXT file
     try:
-        df.to_excel(excel_filename, index=False)
+        with open(output_filename, 'w', encoding='utf-8') as f:
+            for url in unique_urls:
+                f.write(f"{url}\n")
+
         end_time = datetime.now()
         processing_time = (end_time - start_time).total_seconds()
-        
-        success_color = get_random_color()
-        print(f"\n{success_color}Processing completed:{Style.RESET_ALL}")
-        print(f"{success_color}{'=' * 50}{Style.RESET_ALL}")
-        
+
+        print(f"\n{get_random_color()}Processing completed:{Style.RESET_ALL}")
+        print(f"{get_random_color()}{'=' * 50}{Style.RESET_ALL}")
+
         stats = [
             ("Total sitemaps processed", len(sitemap_urls)),
-            ("Total URLs found", len(df)),
+            ("Total URLs found (unique)", len(unique_urls)),
             ("Processing time", f"{processing_time:.2f} seconds"),
-            ("Speed", f"{len(df)/processing_time:.2f} URLs/second")
+            ("Speed", f"{len(unique_urls)/processing_time:.2f} URLs/second")
         ]
-        
-        # Print statistics with different colors
+
         for stat, value in stats:
-            color = get_random_color()
-            print(f"{color}{stat}: {Style.RESET_ALL}{value}")
-        
-        final_color = get_random_color()
-        print(f"\n{final_color}Results saved to: {Style.RESET_ALL}{excel_filename}")
+            print(f"{get_random_color()}{stat}: {Style.RESET_ALL}{value}")
+
+        print(f"\n{get_random_color()}Results saved to:{Style.RESET_ALL} {output_filename}")
+
     except Exception as e:
-        logger.error(f"{Fore.RED}Error saving Excel file: {str(e)}{Style.RESET_ALL}")
+        logger.error(f"{Fore.RED}Error saving TXT file: {str(e)}{Style.RESET_ALL}")
 
 if __name__ == "__main__":
     # Set event loop policy for Windows
     if platform.system() == 'Windows':
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    
+
     # Run async main
     try:
         asyncio.run(main())
     finally:
-        # Reset colorama styles
         print(Style.RESET_ALL)
